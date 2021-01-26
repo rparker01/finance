@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Bought
+{% endblock %}
+
+{% block main %}
+
+    <table>
+        <tr>
+            <td>Current balance</td>
+            <td>Cost of purchase</td>
+            <td>New balance</td>
+        </tr>
+        <tr>
+            <td>{{ cash }}</td>
+            <td>{{ costOfShares }}</td>
+            <td>{{ balance }}</td>
+        </tr>
+    </table>
+
+    <h1>You have requested to buy {{ numOfShares }} shares in {{ bought.name }} at a price of ${{ bought.price }} USD per share</h1>
+{% endblock %}
