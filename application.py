@@ -172,7 +172,33 @@ def register():
 @login_required
 def sell():
     """Sell shares of stock"""
-    return apology("TODO")
+    stocks = db.execute("SELECT symbol FROM purchases WHERE user_id = ? GROUP BY symbol", session["user_id"])
+    return render_template("sell.html", stocks=stocks)
+    if request.method == "POST":
+        currentTime = datetime.datetime.now()
+        symbol = request.form.get("symbol")
+        numOfShares = request.form.get("shares")
+        bought = lookup(symbol)
+        price=bought["price"]
+        cash = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])
+        cashValue = float(cash[0]["cash"])
+
+        #This section will calculate the cost of the shares and subtract from the user's balance.
+        costOfShares = int(numOfShares) * price
+        balance = cashValue - costOfShares
+
+        #This will check the balance of the user before making a purchase
+        if cashValue < costOfShares:
+            return apology("Your balance is too low!")
+        else:
+            implement an INSERT on database to track the purchase of the shares
+            purchase = db.execute("INSERT INTO purchases (user_id, symbol, share_price, num_shares, total_cost, timestamp) VALUES(?, ?, ?, ?, ?, ?)", \
+                                session["user_id"], symbol, price, numOfShares, costOfShares, currentTime)
+            newBalance = db.execute("UPDATE users SET cash = ? WHERE id = ?", balance, session["user_id"])
+
+
+            return render_template("bought.html", balance=balance, costOfShares=costOfShares, bought=bought, numOfShares=numOfShares, cash=cash[0]["cash"])
+    return render_template("buy.html")
 
 
 def errorhandler(e):
