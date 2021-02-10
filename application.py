@@ -1,4 +1,5 @@
 ''' export API_KEY=pk_112e4d8b2bb344ef93b726ce0197265c  '''
+''' cd cs50/week9/src9/pset9/finance '''
 
 import os
 import datetime
@@ -50,10 +51,14 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    groups = db.execute("SELECT symbol, SUM(num_shares) AS sum FROM purchases WHERE user_id = ? GROUP BY symbol", session["user_id"] )
+
+    # Queries purchases table and returns a grouped value for each unique stock.
+    groups = db.execute("SELECT symbol, SUM(num_shares) AS sum FROM transactions WHERE user_id = ? GROUP BY symbol", session["user_id"])
     cash = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])
     cashValue = float(cash[0]["cash"])
-    return render_template("index.html",groups=groups, cashValue=cashValue)
+
+
+    return render_template("index.html", groups=groups, cashValue=cashValue)
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -68,6 +73,7 @@ def buy():
         price=bought["price"]
         cash = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])
         cashValue = float(cash[0]["cash"])
+        trans_type = "BUY"
 
         # This section will calculate the cost of the shares and subtract from the user's balance.
         costOfShares = int(numOfShares) * price
@@ -78,8 +84,9 @@ def buy():
             return apology("Your balance is too low!")
         else:
             # implement an INSERT on database to track the purchase of the shares
-            purchase = db.execute("INSERT INTO purchases (user_id, symbol, share_price, num_shares, total_cost, timestamp) VALUES(?, ?, ?, ?, ?, ?)", \
-                                session["user_id"], symbol, price, numOfShares, costOfShares, currentTime)
+            purchase = db.execute("INSERT INTO transactions (user_id, symbol, share_price, num_shares, total_cost, timestamp, trans_type) VALUES(?, ?, ?, ?, ?, ?, ?)", \
+                                session["user_id"], symbol, price, numOfShares, costOfShares, currentTime, trans_type)
+
             newBalance = db.execute("UPDATE users SET cash = ? WHERE id = ?", balance, session["user_id"])
 
 
@@ -87,11 +94,17 @@ def buy():
     return render_template("buy.html")
 
 
+
 @app.route("/history")
 @login_required
 def history():
-    """Show history of transactions"""
-    return apology("TODO")
+    # Queries purchases table and returns a grouped value for each unique stock.
+    groups = db.execute("SELECT * FROM transactions WHERE user_id = ?", session["user_id"])
+    cash = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])
+    cashValue = float(cash[0]["cash"])
+
+
+    return render_template("history.html", groups=groups, cashValue=cashValue)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -172,33 +185,38 @@ def register():
 @login_required
 def sell():
     """Sell shares of stock"""
-    stocks = db.execute("SELECT symbol FROM purchases WHERE user_id = ? GROUP BY symbol", session["user_id"])
-    return render_template("sell.html", stocks=stocks)
+    stocks = db.execute("SELECT symbol FROM transactions WHERE user_id = ? GROUP BY symbol", session["user_id"])
+
     if request.method == "POST":
+
         currentTime = datetime.datetime.now()
         symbol = request.form.get("symbol")
-        numOfShares = request.form.get("shares")
-        bought = lookup(symbol)
-        price=bought["price"]
+        numOfShares = int(request.form.get("shares"))
+        sold = lookup(symbol)
+        price=sold["price"]
         cash = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])
         cashValue = float(cash[0]["cash"])
+        trans_type = "SELL"
 
-        #This section will calculate the cost of the shares and subtract from the user's balance.
-        costOfShares = int(numOfShares) * price
-        balance = cashValue - costOfShares
+        # This section will calculate the value of the shares and add to the user's balance.
+        valueOfShares = numOfShares * price
+        balance = cashValue + valueOfShares
+        negValue = valueOfShares * -1
+        negNumShares = numOfShares * -1
 
-        #This will check the balance of the user before making a purchase
-        if cashValue < costOfShares:
-            return apology("Your balance is too low!")
+        # This will check the value of the shares is not 0 or lower
+        if valueOfShares <= 0:
+            return apology("Your shares are worthless!")
         else:
-            implement an INSERT on database to track the purchase of the shares
-            purchase = db.execute("INSERT INTO purchases (user_id, symbol, share_price, num_shares, total_cost, timestamp) VALUES(?, ?, ?, ?, ?, ?)", \
-                                session["user_id"], symbol, price, numOfShares, costOfShares, currentTime)
+            # implement an INSERT on database to track the sale of the shares
+            sale = db.execute("INSERT INTO transactions (user_id, symbol, share_price, num_shares, total_cost, timestamp, trans_type) VALUES(?, ?, ?, ?, ?, ?, ?)", \
+                                session["user_id"], symbol, price, negNumShares, negValue, currentTime, trans_type)
+
             newBalance = db.execute("UPDATE users SET cash = ? WHERE id = ?", balance, session["user_id"])
 
 
-            return render_template("bought.html", balance=balance, costOfShares=costOfShares, bought=bought, numOfShares=numOfShares, cash=cash[0]["cash"])
-    return render_template("buy.html")
+            return render_template("sold.html", symbol=symbol, balance=balance, valueOfShares=negValue, sold=sold, numOfShares=negNumShares, cash=cash[0]["cash"])
+    return render_template("sell.html", stocks=stocks)
 
 
 def errorhandler(e):
